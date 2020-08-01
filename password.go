@@ -1,0 +1,56 @@
+package password
+
+import (
+	"errors"
+	"strings"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	// ErrPasswordIncorrect indicates password is incorrect
+	ErrPasswordIncorrect = errors.New("password incorrect")
+	// ErrHashInvalid indicates hash is invalid
+	ErrHashInvalid = errors.New("invalid hash")
+)
+
+//Hash service
+type Hash struct{}
+
+var deliminator = "||"
+
+//Generate a salted hash for the input string
+func (c *Hash) Generate(s string) (string, error) {
+	salt := NewUUID()
+	saltedBytes := []byte(s + salt)
+	hashedBytes, err := bcrypt.GenerateFromPassword(saltedBytes, bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	hash := string(hashedBytes[:])
+	return hash + deliminator + salt, nil
+}
+
+//Compare string to generated hash
+func (c *Hash) Compare(hash string, s string) error {
+	parts := strings.Split(hash, deliminator)
+	if len(parts) != 2 {
+		return ErrHashInvalid
+	}
+
+	incoming := []byte(s + parts[1])
+	existing := []byte(parts[0])
+	err := bcrypt.CompareHashAndPassword(existing, incoming)
+	if err == bcrypt.ErrMismatchedHashAndPassword {
+		return ErrPasswordIncorrect
+	}
+
+	return nil
+}
+
+// NewUUID generates a new v4 UUID
+func NewUUID() string {
+	return uuid.New().String()
+}
